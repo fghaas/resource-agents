@@ -724,9 +724,9 @@ get_reader_vip_attr() {
    attr_value=`$CRM_ATTR -l reboot --name readerOK --query -q` 
    rc=$?
    if [ "$rc" -eq "0" ]; then
-      return $attr_value
+      echo $attr_value
    else
-      return 0
+      echo 0
    fi
 
 }

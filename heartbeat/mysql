@@ -710,7 +710,7 @@ set_reader_vip_attr() {
 
    curr_attr_value=$(get_reader_vip_attr)
    
-   if [ $curr_attr_value -ne $1 ]; then
+   if [ "$curr_attr_value" -ne "$1" ]; then
 	 $CRM_ATTR -l reboot --name readerOK  -v $1
    fi
 

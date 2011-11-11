@@ -77,12 +77,12 @@ meta_data()
   <shortdesc lang="en">Manages an OpenVZ Virtual Environment (VE)</shortdesc>
 
   <parameters>
-    <parameter name="veid" unique="0" required="1">
+    <parameter name="veid" unique="1" required="1">
       <longdesc lang="en">
         OpenVZ ID of virtual environment (see output of vzlist -a for all assigned IDs)
       </longdesc>
       <shortdesc lang="en">OpenVZ ID of VE</shortdesc>
-      <content type="integer" default="" />
+      <content type="integer" />
     </parameter>
   </parameters>
 

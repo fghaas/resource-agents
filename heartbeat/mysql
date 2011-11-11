@@ -726,7 +726,7 @@ get_reader_vip_attr() {
    if [ "$rc" -eq "0" ]; then
       echo $attr_value
    else
-      echo 0
+      echo -1
    fi
 
 }

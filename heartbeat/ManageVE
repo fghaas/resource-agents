@@ -67,7 +67,7 @@ meta_data()
 <?xml version="1.0"?>
 <!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
 <resource-agent name="ManageVE">
-  <version>1.00.4</version>
+  <version>1.00.5</version>
 
   <longdesc lang="en">
     This OCF compliant resource agent manages OpenVZ VEs and thus requires
@@ -83,6 +83,17 @@ meta_data()
       </longdesc>
       <shortdesc lang="en">OpenVZ ID of VE</shortdesc>
       <content type="integer" />
+    </parameter>
+    <parameter name="always_suspend">
+      <longdesc lang="en">
+        Always try to suspend the container during shutdown, and always
+        try to restore from checkpoint during startup. Only if those fail,
+        resort to really starting up or shutting down the container.
+        If not set, start and stop normally, and do checkpoint/restore
+        only during native migration (if enabled).
+      </longdesc>
+      <shortdesc lang="en">Always checkpoint during stop, and restore during start</shortdesc>
+      <content type="boolean" />
     </parameter>
   </parameters>
 
@@ -151,14 +162,14 @@ migrate_to_ve()
 {
   if ! status_ve; then
     ocf_log err "VE $VEID is not running, aborting"
-    exit $OCF_ERR_GENERIC
+    return $OCF_ERR_GENERIC
   fi
-  ocf_run $VZCTL chkpnt $VEID || exit $OCF_ERR_GENERIC
+  ocf_run $VZCTL chkpnt $VEID || return $OCF_ERR_GENERIC
   return $OCF_SUCCESS
 }
 
 #
-# migrate_to_ve()
+# migrate_from_ve()
 #
 # In the process of a resource migration, restores the VE. For this to
 # work, vzctl must obviously have access to the dump file which was
@@ -167,7 +178,7 @@ migrate_to_ve()
 #
 migrate_from_ve()
 {
-  ocf_run $VZCTL restore $VEID || exit $OCF_ERR_GENERIC
+  ocf_run $VZCTL restore $VEID || return $OCF_ERR_GENERIC
   return $OCF_SUCCESS
 }
 
@@ -181,14 +192,18 @@ migrate_from_ve()
 #
 status_ve()
 { 
-  declare -i retcode
+  local rc
+  local veexists
+  local vestatus
+  local vesuspended
 
   veexists=`$VZCTL status $VEID 2>/dev/null | $AWK '{print $3}'`
   vestatus=`$VZCTL status $VEID 2>/dev/null | $AWK '{print $5}'`
-  retcode=$?
+  vesuspended=`$VZCTL status $VEID 2>/dev/null | $AWK '{print $6}'`
+  rc=$?
 
-  if [[ $retcode != 0 ]]; then
-    ocf_log err "vzctl status $VEID returned: $retcode"
+  if [[ $rc != 0 ]]; then
+    ocf_log err "vzctl status $VEID returned: $rc"
     exit $OCF_ERR_GENERIC
   fi
 
@@ -199,8 +214,12 @@ status_ve()
 
   case "$vestatus" in
     running)
-        return $OCF_SUCCESS
-        ;;
+	  if ocf_is_true $OCF_RESKEY_always_suspend \
+	      && [ "$vesuspended" = "suspended" ]; then
+		  return $OCF_NOT_RUNNING
+	  fi
+          return $OCF_SUCCESS
+          ;;
     down)
 	return $OCF_NOT_RUNNING
         ;;
@@ -283,10 +302,18 @@ check_binary $AWK
 #
 case "$1" in
   start)
-	start_ve
+	if ocf_is_true $OCF_RESKEY_always_suspend; then
+	    migrate_from_ve || start_ve
+	else
+	    start_ve
+	fi
 	;;
   stop)
-	stop_ve
+	if ocf_is_true $OCF_RESKEY_always_suspend; then
+	    migrate_to_ve || stop_ve
+	else
+	    stop_ve
+	fi
 	;;
   status|monitor) 
 	status_ve

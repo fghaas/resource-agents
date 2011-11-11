@@ -491,7 +491,7 @@ check_slave() {
 	fi
      
      # If we got max_connections, let's remove the vip
-	if [ $last_errno -ne 1040 ]; then
+	if [ $last_errno -eq 1040 ]; then
 	    set_reader_vip_attr 0
 	    exit $OCF_SUCCESS
      fi

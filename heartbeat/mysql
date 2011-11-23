@@ -134,7 +134,7 @@ The 'promote' operation makes this mysql server run as master
 The 'demote' operation makes this mysql server run as slave
 The 'validate-all' operation reports whether the parameters are valid
 
-    UEND
+UEND
 }
 
 meta_data() {

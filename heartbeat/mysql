@@ -343,7 +343,7 @@ Enable the usage of the MHA tool to setup master.
 <action name="meta-data" timeout="5" />
 </actions>
 </resource-agent>
-    END
+END
 }
 #######################################################################
 # Convenience variables

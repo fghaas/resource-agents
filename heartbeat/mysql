@@ -486,7 +486,13 @@ check_slave() {
             # doesn't restart in place.
             ocf_log err "MySQL instance configured for replication, but replication has failed."
             ocf_log err "See $tmpfile for details"
-            exit $OCF_ERR_INSTALLED
+            
+            # Just pull the reader VIP away, killing MySQL here would be pretty evil
+            # on a loaded server
+            
+            set_reader_vip_attr 0
+            exit $OCF_SUCCESS
+
         fi
         
         # If we got max_connections, let's remove the vip

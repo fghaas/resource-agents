@@ -734,6 +734,33 @@ get_reader_vip_attr() {
     
 }
 
+# Set the attribute controlling the writer VIP
+set_writer_vip_attr() {
+    local curr_attr_value
+    
+    curr_attr_value=$(get_writer_vip_attr)
+    
+    if [ "$curr_attr_value" -ne "$1" ]; then
+        $CRM_ATTR -l reboot --name writerOK  -v $1
+    fi
+    
+}
+
+# get the attribute controlling the writer VIP
+get_writer_vip_attr() {
+    local attr_value
+    local rc
+    
+    attr_value=`$CRM_ATTR -l reboot --name writerOK --query -q`
+    rc=$?
+    if [ "$rc" -eq "0" ]; then
+        echo $attr_value
+    else
+        echo -1
+    fi
+    
+}
+
 # Stores data for MASTER STATUS from MySQL
 update_data_master_status() {
    tmpfile=`mktemp ${HA_RSCTMP}/master_status.${OCF_RESOURCE_INSTANCE}.XXXXXX`
@@ -854,18 +881,22 @@ mysql_monitor() {
     fi
     
     if ocf_is_ms && ! get_read_only; then
-        ocf_log info "MySQL monitor succeeded (master)";
+        set_writer_vip_attr 1
+        ocf_log debug "MySQL monitor succeeded (master)";
         return $OCF_RUNNING_MASTER
     else
-        ocf_log info "MySQL monitor succeeded";
+        set_writer_vip_attr 0
+        ocf_log debug "MySQL monitor succeeded";
         return $OCF_SUCCESS
     fi
 }
 
 mysql_start() {
     if ocf_is_ms; then
-        # Initialize the ReaderVIP attribute, monitor will enable it
+        # Initialize the readerOK and writerOK attributes, 
+        # monitor or promote will enable them
         set_reader_vip_attr 0
+        set_writer_vip_attr 0
     fi
     
     mysql_status
@@ -1077,7 +1108,10 @@ mysql_promote() {
     
     # A master can accept reads
     set_reader_vip_attr 1
-    
+
+    # A master can accept writes
+    set_writer_vip_attr 1
+
     return $OCF_SUCCESS
 }
 
@@ -1085,7 +1119,15 @@ mysql_demote() {
     if ! mysql_status; then
         return $OCF_NOT_RUNNING
     fi
-    
+
+    set_read_only on
+    if [ $? -ne 0 ]; then
+        ocf_log err "Failed to set read-only";
+        return $OCF_ERR_GENERIC;
+    fi
+
+    set_writer_vip_attr 0
+
     # Return master preference to default, so the cluster manager gets
     # a chance to select a new master
     $CRM_MASTER -v 1

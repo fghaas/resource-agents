@@ -430,35 +430,31 @@ xup_validate_all () {
 	;;
   esac
 }
-if
-  ( [ $# -ne 1 ] )
-then
-  xup_usage
-  exit $OCF_ERR_ARGS
+
+if [ $# -ne 1 ]; then
+    xup_usage
+    exit $OCF_ERR_ARGS
 fi
 
 # These operations do not require OCF instance parameters to be set
 case "$1" in
-  meta-data)
+    meta-data)
 	meta_data
 	exit $OCF_SUCCESS
 	;;
-  usage)
+    usage)
 	xup_usage
 	exit $OCF_SUCCESS
 	;;
-  *)	;;
 esac
 
-if 
-  [ -z "$OCF_RESKEY_service" ]
-then
-  ocf_log err "Please set OCF_RESKEY_service to the service managed by Xinetd"
-  if [ "$1" = "start" ]; then 
-      exit $OCF_ERR_ARGS
-  else
-      exit $OCF_NOT_RUNNING
-  fi
+if [ -z "$OCF_RESKEY_service" ]; then
+    ocf_log err "Please define \"service\" parameter"
+    if [ "$1" = "start" ]; then 
+	exit $OCF_ERR_ARGS
+    else
+	exit $OCF_NOT_RUNNING
+    fi
 fi
 
 service=$OCF_RESKEY_service
@@ -477,28 +473,27 @@ fi
 
 # See how we were called.
 case "$1" in
-  start)
+    start)
 	xup_start
 	;;
-  stop)
+    stop)
 	xup_stop
 	;;
-  restart)
+    restart)
 	$0 stop
 	$0 start
 	;;
-  status)
+    status)
 	xup_status
 	;;
-  monitor)
+    monitor)
 	xup_status > /dev/null
 	;;
-  validate-all)
+    validate-all)
 	xup_validate_all
 	;;
-  *)
+    *)
 	xup_usage
 	exit $OCF_ERR_UNIMPLEMENTED
 esac
-
 exit $?

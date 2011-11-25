@@ -474,7 +474,7 @@ get_slave_info() {
 
 check_slave() {
     # Checks slave status
-    local rc
+    local rc new_master_IP
     
     get_slave_info
     rc=$?
@@ -507,6 +507,17 @@ check_slave() {
             # temporarily shut down, and the slave may just be
             # reconnecting. A warning can't hurt, though.
             ocf_log warn "MySQL Slave IO threads currently not running."
+
+            # Sanity check, are we at least on the right master
+            new_master_IP=`${HA_SBIN_DIR}/crm_attribute --type crm_config --name replication_info -s mysql_replication --query  -q | $CUT -d'|' -f1`
+            
+            if [ "$master_host" != "$new_master_IP" ]; then
+               # Not pointing to the right master, not good, removing the VIPs
+               set_reader_vip_attr 0
+
+               exit $OCF_SUCCESS
+            fi
+
         fi
         
         if [ "$slave_sql" != 'Yes' ]; then
@@ -1142,7 +1153,7 @@ mysql_notify() {
                 for thread in `awk '$0 !~ /Binlog Dump|system user|event_scheduler|SHOW PROCESSLIST/ && $0 ~ /^[0-9]/ {print $1}' $tmpfile`
                 do
                     ocf_run $MYSQL $mysql_options \
-                    -e "KILL ${thread}"
+                        -e "KILL ${thread}"
                 done
                 return $OCF_SUCCESS
             fi

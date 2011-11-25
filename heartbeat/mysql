@@ -1161,6 +1161,14 @@ mysql_notify() {
                 return $OCF_SUCCESS
             fi
 
+            ocf_log info "Resetting replication"
+            unset_master
+            if [ $? -ne 0 ]; then
+                return $OCF_ERR_GENERIC
+            else
+                return $OCF_SUCCESS
+            fi
+
             ocf_log info "Changing MySQL configuration to replicate from $master_host"
             set_master
             if [ $? -ne 0 ]; then

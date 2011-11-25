@@ -744,8 +744,7 @@ get_master_status() {
 # crm_attribute command looks like this:
 # scope=nodes  name=IP value=10.2.2.161
 get_local_ip() {
-   do_cmd crm_attribute --type nodes --node-uname $(uname -n) --attr-name IP -G \
-      | awk -F= '/name=IP/{print $NF}'
+   $CRM_ATTR -l forever -n IP -q -G
 }
 
 #######################################################################

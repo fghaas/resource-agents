@@ -3,8 +3,9 @@
 # Startup/shutdown script for services managed by xinetd.
 #
 #	Copyright (C) 2003 Charlie Brooks
+#	Copyright (C) 2011 Ulrich Windl
 #
-# WARNING:	Tested ONLY on Red Hat 7.3 and Fedora Core 2/4 at this time.
+# WARNING:	Tested ONLY on SLES11 SP1 at this time.
 #
 # Author:	Charlie Brooks <ha@HBCS.Org>
 # Description:	given parameters of a service name and start|stop|status,

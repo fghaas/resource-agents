@@ -23,6 +23,9 @@
 : ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
 . ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
 
+service=$OCF_RESKEY_service
+SVCDEF=/etc/xinetd.d/$service
+
 #######################################################################
 
 meta_data() {
@@ -457,13 +460,9 @@ if [ -z "$OCF_RESKEY_service" ]; then
     fi
 fi
 
-service=$OCF_RESKEY_service
-RCFILE=/etc/xinetd.d/$service
-PIDFILE=$HA_VARRUN/xup$service
-
 # Make sure the OCF_RESKEY_service is a valid xinetd service name
-if [ ! -f $RCFILE ]; then
-    ocf_log err "Service descriptor $RCFILE not found!"
+if [ ! -f $SVCDEF ]; then
+    ocf_log err "Service definition $SVCDEF not found!"
     if [ "$1" = "start" ]; then 
 	exit $OCF_ERR_ARGS
     else

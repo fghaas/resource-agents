@@ -11,7 +11,7 @@
 #		Sebastian Reitenbach:         add OpenBSD defaults, more cleanup
 #		Narayan Newton:               add Gentoo/Debian defaults
 #		Marian Marinov, Florian Haas: add replication capability
-#		Yves Trudeau:                 add VIP support and improve replication
+#		Yves Trudeau, Baron Schwartz: add VIP support and improve replication
 #
 # Support:  linux-ha@lists.linux-ha.org
 # License:  GNU General Public License (GPL)

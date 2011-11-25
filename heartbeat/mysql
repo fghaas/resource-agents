@@ -1095,34 +1095,8 @@ mysql_notify() {
     
     case "$type_op" in
         'pre-promote')
-            # A new master is about to being promoted. It's not in
-            # read-write mode yet (that only occurs when it actually
-            # executes the promote action), so we can now safely
-            # connect to it and wait for it to start replicating.
-            
-            local master_host
-            local master_status
-            master_host=`echo $OCF_RESKEY_CRM_meta_notify_promote_uname`
-            
-            if ( ! mysql_status ); then
-                return $OCF_NOT_RUNNING
-            fi
-            if [ -z "$master_host" ]; then
-                ocf_log err "Unable to determine master host!"
-                return $OCF_ERR_GENERIC
-            fi
-            
-            if [ $master_host = `uname -n` ]; then
-                ocf_log info "This will be new master"
-            else
-                ocf_log info "Changing MySQL configuration to replicate from $master_host"
-                set_master $master_host
-                if [ $? -ne 0 ]; then
-                    return $OCF_ERR_GENERIC
-                else
-                    return $OCF_SUCCESS
-                fi
-            fi
+            # Nothing to do now here, new replication info not yet published
+
         ;;
         'post-promote')
             # The master has completed its promotion. Now is a good
@@ -1133,7 +1107,16 @@ mysql_notify() {
                 ocf_log info "Ignoring post-promote notification for my own promotion."
                 return $OCF_SUCCESS
             fi
-            start_slave $master_host
+
+            ocf_log info "Changing MySQL configuration to replicate from $master_host"
+            set_master
+            if [ $? -ne 0 ]; then
+                return $OCF_ERR_GENERIC
+            else
+                return $OCF_SUCCESS
+            fi
+
+            start_slave
             if [ $? -ne 0 ]; then
                 ocf_log err "Failed to start slave"
                 return $OCF_ERR_GENERIC

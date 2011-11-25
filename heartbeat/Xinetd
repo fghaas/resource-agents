@@ -95,341 +95,73 @@ hup_inetd () {
     fi
 }
 
-xup_start () {
-  if [ "running" = "`xup_status`" ]; then
-    ocf_log info "Service $service already started"
-    exit $OCF_SUCCESS
-  fi
-
-  ocf_log "info" "$0: enabling in $RCFILE"
-  if $AWK '!/disable/' $RCFILE > $RCFILE.xup
-    then
-      if mv $RCFILE.xup $RCFILE
-        then
-          ocf_log "info" "$0: Starting"
-          hup_inetd
-          touch $PIDFILE
-        else
-          ocf_log "err" "Could not replace $RCFILE"
-      fi
-    else
-      ocf_log "err" "Could not rewrite $RCFILE!"
-  fi
+# check "disable = X", printing X
+check_service()
+{
+    ocf_log "info" "$0: checking \"disable\" in $1"
+    typeset result=$(sed -nre 's/^[ 	]*disable[ 	]*=[ 	]*([^ 	]+)[# 	]*/\1/p' $1)
+    echo "$result"
 }
 
-xup_stop () {
-  if [ "stopped" = "`xup_status`" ]; then
-    ocf_log info "Service $service already stopped"
-    exit $OCF_SUCCESS
-  fi
-
-  ocf_log "info" "$0: disabling in $RCFILE"
-  if $AWK '!/disable/;/{/{printf "\tdisable\t\t\t= yes\n"}' $RCFILE >$RCFILE.xup
+# change "disable = X" to desired value
+change_service()
+{
+    ocf_log "info" "$0: setting \"disable = $1\" in $2"
+    if ! sed -i -re 's/^([ 	]*disable[ 	]*=[ 	]*)([^ 	]+)([# 	]*)/\1'"$1"'\3/' $2
     then
-      if mv $RCFILE.xup $RCFILE
-        then
-          ocf_log "info" "$0: Shutting down"
-          hup_inetd 
-          rm -f $PIDFILE
-        else
-          ocf_log "err" "Could not replace $RCFILE"
-      fi
-    else
-      ocf_log "err" "Could not rewrite $RCFILE!"
-  fi
-}
-
-xup_usage () {
-        echo "Usage: $0 {start|stop|restart|status|monitor|validate-all|meta-data}"
-	return 0
+	ocf_log "err" "Failed to change $2"
+	return 1
+    fi
+    return 0
 }
 
 xup_status () {
-  	if [ -f $PIDFILE ]; then
-		echo running
-		return $OCF_SUCCESS
-	else
-		echo stopped
-		return $OCF_NOT_RUNNING
-	fi
+    typeset disabled="$(check_service $SVCDEF)"
+    if [ "${disabled:=no}" = no ]; then
+	echo running
+	return $OCF_SUCCESS
+    elif [ "$disabled" = yes ]; then
+	echo stopped
+	return $OCF_NOT_RUNNING
+    else
+	echo unknown
+	return $OCF_ERR_CONFIGURED
+    fi
 }
 
-#
-#	Check if the arg is a valid integer
-#
-CheckInteger() {
-#	Examples of valid integer: "1080", "1", "0080", "0", "0000"
-#	Examples of invalid integer: "1080bad", ""
-  case "$1" in
-    "") #empty string 
-	false;;
-    *[!0-9]*) #got invalid char
-	false;;
-    *) #no invalid char, and has at least one digit, so is a good integer
-	true;;
-  esac
+xup_start () {
+    if [ "running" = "`xup_status`" ]; then
+	ocf_log info "Service $service already started"
+	exit $OCF_SUCCESS
+    fi
+    ocf_log "info" "$0: enabling in $SVCDEF"
+    if change_service "no" $SVCDEF; then
+        hup_inetd 
+    fi
 }
 
-#
-#	Check if the arg is a valid umask
-#
-CheckUmask() {
-#	Examples of valid umask: "100", "1", "000", "0"
-#	Examples of invalid umask: "108", "bad", "1111" ""
-  case "$1" in
-    [0-7])
-	true;;
-    [0-7][0-7])
-	true;;
-    [0-7][0-7][0-7])
-	true;;
-    *)
-	false;;
-  esac
+xup_stop () {
+    if [ "stopped" = "`xup_status`" ]; then
+	ocf_log info "Service $service already stopped"
+	exit $OCF_SUCCESS
+    fi
+    ocf_log "info" "$0: disabling in $SVCDEF"
+    if change_service "yes" $SVCDEF; then
+        hup_inetd 
+    fi
 }
 
-# Check (part of) the attributes based on xinetd.conf(5) and xinetd source code
-#	confparse.c
-#	parsers.c
-#	attr.h
-check_attributes () {
-  # Empty these attributes before validating them 
-  unset socket_type wait server user protocol port group instances type \
-	flags disable nice umask
-  VAR=""
-  for SECTION in $*; do
-    case $SECTION in
-      *=*) # Check to see if we need to export the previous name=value
-           # pair.
-           if [ -n "$VAR" ]; then
-             export "$VAR"
-           fi
-           # Save the "new" name=value pair in VAR
-           VAR=$SECTION
-           ;;
-      *)   # This section does not have an equal sign, therefore it is part of
-           # the *previous* name=value pair, thus we will append it to the
-           # previous name=value assignment.
-           VAR="$VAR $SECTION"
-           ;;
-    esac
-    # A final cleanup step.
-    # Do we need to export VAR ?
-    if [ -n "$VAR" ]; then
-      export "$VAR"
-    fi  
-  done
-  if [ $? -ne 0 ]; then
-	return $OCF_ERR_GENERIC
-  fi
-
-  case $disable in
-	"")	disable=no # Default to no.
-		;;
-	yes|no)	;;
-	*)	ocf_log err "Invalid value for disable [$disable] in $RCFILE, yes|no please"
-		exit $OCF_ERR_CONFIGURED
-		;;
-  esac
-
-  case $socket_type in
-	"") 	socket_type=dgram
-		# Default value for socket_type is dgram.
-		;;
-	stream|dgram|raw|seqpacket)
-		;;
-	*)	ocf_log err "Invalid socket type $socket_type in $RCFILE"
-		exit $OCF_ERR_CONFIGURED
-		;;
-  esac
-
-  case $wait in # Wait has no default value.
-	yes|no)	;;
-	*)	ocf_log err "Invalid waid [$wait] in $RCFILE, yes|no please"
-		exit $OCF_ERR_CONFIGURED
-	    	;;
-  esac
-
-  case $type in
-  # Default value for type is RPC or INTERNAL, determined at compile time.
-  # It may be a list in $RCFILE, however we only capture the first one.
-	""|RPC|INTERNAL|UNLISTED|SPECIAL|TCPMUX|TCPMUXPLUS)
-		;;
-	*)	ocf_log err "Invalid service type [$type] in $RCFILE"
-		exit $OCF_ERR_CONFIGURED
-		;;
-  esac
-
-  if [ ! -z "$type" -a "INTERNAL" != "$type" ]; then
-  # Type is explicitly set to EXTERNAL, hence server and user are necessary.
-	case $server in
-	    "")	ocf_log err "Please specify server in $RCFILE"
-		exit $OCF_ERR_CONFIGURED
-		;;
-	    /*)	if [ -x $server ]; then
-			: OK
-	 	else
-			ocf_log err "Server $server is not executable"
-			exit $OCF_ERR_CONFIGURED
-		fi
-		;;
-	    *)	ocf_log err "Server $server is not of obsolute path"
-		exit $OCF_ERR_CONFIGURED
-		;;
-	esac 
-
-	case $user in
-	    "")	ocf_log err "Please specify user in $RCFILE"
-		exit $OCF_ERR_CONFIGURED
-		;;
-	    *)	getent passwd $user >/dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			ocf_log err "User $user does not exist!"
-			exit $OCF_ERR_CONFIGURED
-		fi
-		;;
-	esac
-
-	# Protocol is necessary when type is MUX
-	if [ $type = "TCPMUX" -o $type ="TCPMUXPLUS" ]; then
-	    case $protocol in
-		"")	ocf_log err "Please specify protocol in $RCFILE"
-			exit $OCF_ERR_CONFIGURED
-			;;
-		*)	get protocols $protocol >/dev/null 2>&1
-			if [ $? -ne 0 ]; then
-			    ocf_log err "Invalid protocol [$protocol] in $RCFILE"
-			    exit $OCF_ERR_CONFIGURED
-			fi
-			;;
-  	    esac
-	fi
-  fi
-
-  case $group in
-	"")	;; # OK to be empty, the group for $user is used
-	 *)	getent group $group >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		ocf_log err "Group $group does not exist!"
-		exit $OCF_ERR_CONFIGURED
-	fi
-	;;
-  esac
-
-  case $flags in
-  # Default value for flags is REUSE.
-  # It may be a list in $RCFILE, however we only capture the first one.
-	"")	flags=RESUME
-		;;
-	REUSE|INTERCEPT|NORETRY|IDONLY|NAMEINARGS|NODELAY|KEEPALIVE|NOLIBWRAP|SENSOR|IPv4|IPv6)	;;
-	*)	ocf_log err "Invalid flags [$flags] in $RCFILE"
-		exit $OCF_ERR_CONFIGURED
-		;;
-  esac
-
-  case $instances in
-	""|[Uu][Nn][Ll][Ii][Mm][Ii][Ti][Ee][Dd])	;;
-	*)	if CheckInteger $instances; then
-		    : OK
-		else
-		    ocf_log err "Invalid instances [$instances] in $RCFILE, non-negative integer expected"
-		    exit $OCF_ERR_CONFIGURED
-		fi
-		;;
-  esac
-
-  case $nice in
-	"")	;;
-	*)	local foo=`echo $nice | sed s/^-//`
-		if CheckInteger $foo; then
-		    : OK
-		else
-		    ocf_log err "Invalid nice [$nice] in $RCFILE, integer expected"
-		    exit $OCF_ERR_CONFIGURED
-		fi
-		;;
-  esac
-
-  if [ ! -z $umask ]; then
-	if CheckUmask $umask; then
-	    : OK
-	else
-	    ocf_log err "Invalid umask [$umask] in $RCFILE"
-	    exit $OCF_ERR_CONFIGURED
-	fi
-  fi
+xup_usage () {
+    echo "Usage: $0 {start|stop|restart|status|monitor|validate-all|meta-data}"
+    return 0
 }
 
 xup_validate_all () {
-  check_binary $AWK
-
-# Parse the $RCFILE for necessary attributes, assume $RCFILE does not
-# contain "include" or "includedir" directives.
-  space="[ \t]*"
-  leading_space="^$space"
-  trailing_space="$space$"
-  comment="$space\#"
-
-  # Strip comments, delete blank lines.
-  stripped=`sed -e "/^$comment/d" -e "/=$trailing_space/d" -e "/$leading_space$/d" $RCFILE`
- 
-  stripped=`echo $stripped`
-  # At this stage, stripped="service <service-name> { attribute-list }".
-  case $stripped in
-	*#*)
-	ocf_log err "Descriptor file $RCFILE contains extra \"#\", which is forbidden"
-	exit $OCF_ERR_CONFIGURED
-	;;
-
-	service*)
-	case $stripped in
-	    *[!\	\ +-]=*)
-		ocf_log err "Attribute needs a space before operator ="
-		exit $OCF_ERR_CONFIGURED
-		;;
-	    *[!\	\ ][+-]=*)
-		ocf_log err "Attribute needs a space before operator [+-]="
-		exit $OCF_ERR_CONFIGURED
-		;;
-	    *)	;;
-	esac
-
-	# Strip leading "service" keyword, remove spaces surrounding "=".
-	stripped=`echo $stripped | sed -e "s/^service//" -e "s/-=/ /g" \
-			-e "s/+=/=/g" -e "s/$space=$space/=/g"`
-	# At this stage, stripped=" <service-name> { attribute-list }",
-	# note that the leading space before <service-name> is significant.
-	case $stripped in
-	    " "*)
-	    stripped=`echo $stripped | sed -e "s/$leading_space[^ \t]\+$space//"`
-	    # At this stage, stripped="{ attribute-list }"
-	    case $stripped in
-		{*})
-		stripped=`echo $stripped | sed -e "s/^{//" -e "s/}$//"`
-		# At this stage, stripped=<attribute-list>
-#  		    echo $stripped
-		check_attributes "$stripped"
-		;;
-
-		*)
-		ocf_log err "Attrbute list should be contained in {}"
-		exit $OCF_ERR_CONFIGURED
-		;;
-	    esac
-	    ;;
-
-	    *)
-	    ocf_log err "Service name should follow the service key word"
-	    exit $OCF_ERR_CONFIGURED
-	    ;;
-	esac
-	;;
-
-	*)
-	ocf_log err "Service key word is necessary in $RCFILE"
-	exit $OCF_ERR_CONFIGURED
-	;;
-  esac
+    if [ ! -f "$SVCDEF" ]; then
+        ocf_log err "$0: service $service missing $SVCDEF"
+	return $OCF_ERR_INSTALLED
+    fi
+    return $OCF_SUCCESS
 }
 
 if [ $# -ne 1 ]; then

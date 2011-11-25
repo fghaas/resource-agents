@@ -652,10 +652,15 @@ unset_master(){
             ocf_log info "Master is down, no more binary logs to come"
             break
         fi
+        if grep 'Connecting to master' $tmpfile >/dev/null; then
+            ocf_log info "Master is down, no more binary logs to come"
+            break
+        fi
         if ! grep 'system user' $tmpfile >/dev/null; then
             ocf_log info "Slave is not running - not waiting to finish"
             break
         fi
+         
         sleep 1
     done
     

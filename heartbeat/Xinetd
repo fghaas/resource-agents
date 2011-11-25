@@ -77,23 +77,21 @@ The name of the service managed by xinetd.
 END
 }
 
-# don't rely on the pid file, but lookup xinetd in the list of
-# processes
-
+# force xinetd to reload the service descriptions
 hup_inetd () {
-    pid=`ps -e -o pid,command | grep '/[x]inetd' | awk '{print $1}'`
+    # don't rely on the pid file, but lookup xinetd in the list of
+    # processes
+    pid=`ps -e -o pid,command | $AWK '$2 ~ /\/[x]inetd/ { print $1 }'`
     if [ "$pid" ]; then
-      if kill -s HUP $pid; then
-          :
-      else
-          ocf_log err "Could not SigHUP xinetd superdaemon!"
-          ocf_log err "perhaps we are booting after a system crash"
-          exit $OCF_ERR_GENERIC
-      fi
+	if kill -s HUP $pid; then
+            ocf_log info "Asked xinetd to reload by sending SIGHUP to PID $pid!"
+	else
+            ocf_log err "Failed to send SIGHUP to xinetd PID $pid!"
+            exit $OCF_ERR_GENERIC
+	fi
     else
-       ocf_log err "xinetd superdaemon process not found!"
-       ocf_log err "perhaps we are currently booting the system."
-       exit $OCF_ERR_GENERIC
+	ocf_log err "PID of xinetd not found!"
+	exit $OCF_ERR_GENERIC
     fi
 }
 

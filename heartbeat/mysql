@@ -600,7 +600,7 @@ set_master() {
     # from the laste master the slave replicated from, or freshly
     # reset with RESET MASTER.
     
-    ocf_run $MYSQL_OPTIONS_REPL \
+    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
         -e "CHANGE MASTER TO MASTER_HOST='$new_master_IP', \
         MASTER_USER='$OCF_RESKEY_replication_user', \
         MASTER_PASSWORD='$OCF_RESKEY_replication_passwd' $master_params"

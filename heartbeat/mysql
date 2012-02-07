@@ -271,7 +271,8 @@ MySQL replication user. This user is used for starting and stopping
 MySQL replication, for setting and resetting the master host, and for
 setting and unsetting read-only mode. Because of that, this user must
 have SUPER, REPLICATION SLAVE, REPLICATION CLIENT, and PROCESS
-privileges on all nodes within the cluster.
+privileges on all nodes within the cluster. Mandatory if you define
+a master-slave resource.
 </longdesc>
 <shortdesc lang="en">MySQL replication user</shortdesc>
 <content type="string" default="${OCF_RESKEY_replication_user_default}" />
@@ -279,7 +280,8 @@ privileges on all nodes within the cluster.
 
 <parameter name="replication_passwd" unique="0" required="0">
 <longdesc lang="en">
-MySQL replication password. Used for replication client and slave.
+MySQL replication password. Used for replication client and slave. 
+Mandatory if you define a master-slave resource.
 </longdesc>
 <shortdesc lang="en">MySQL replication user password</shortdesc>
 <content type="string" default="${OCF_RESKEY_replication_passwd_default}" />
@@ -350,7 +352,8 @@ END
 
 MYSQL=$OCF_RESKEY_client_binary
 MYSQL_OPTIONS_LOCAL="-S $OCF_RESKEY_socket --connect_timeout=10"
-MYSQL_OPTIONS_REPL="--user=$OCF_RESKEY_replication_user --password=$OCF_RESKEY_replication_passwd"
+MYSQL_OPTIONS_REPL="$MYSQL_OPTIONS_LOCAL --user=$OCF_RESKEY_replication_user --password=$OCF_RESKEY_replication_passwd"
+MYSQL_OPTIONS_TEST="$MYSQL_OPTIONS_LOCAL --user=$OCF_RESKEY_test_user --password=$OCF_RESKEY_test_passwd"
 
 CRM_MASTER="${HA_SBIN_DIR}/crm_master -l reboot "
 HOSTNAME=`uname -n`
@@ -375,27 +378,16 @@ set_read_only() {
     else
         ro_val="off"
     fi
-    local mysql_options
-    mysql_options="$MYSQL_OPTIONS_LOCAL"
-    if [ -n $OCF_RESKEY_replication_user ]; then
-        mysql_options="$mysql_options $MYSQL_OPTIONS_REPL"
-    fi
-    ocf_run $MYSQL $mysql_options \
-    -e "SET GLOBAL read_only=${ro_val}"
+    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
+        -e "SET GLOBAL read_only=${ro_val}"
 }
 
 get_read_only() {
     # Check if read-only is set
-    local mysql_options
     local read_only_state
     
-    mysql_options="$MYSQL_OPTIONS_LOCAL"
-    if [ -n $OCF_RESKEY_replication_user ]; then
-        mysql_options="$mysql_options $MYSQL_OPTIONS_REPL"
-    fi
-    
-    read_only_state=`$MYSQL $mysql_options \
-    -e "SHOW VARIABLES" | grep read_only | awk '{print $2}'`
+    read_only_state=`$MYSQL $MYSQL_OPTIONS_REPL \
+        -e "SHOW VARIABLES" | grep read_only | awk '{print $2}'`
     
     if [ "$read_only_state" = "ON" ]; then
         return 0
@@ -410,7 +402,6 @@ is_slave() {
     # SLAVE STATUS creates an empty result set, 0 otherwise.
     local rc
     local tmpfile
-    local mysql_options
     
     # Check whether this machine should be slave
     if ! ocf_is_ms || ! get_read_only; then
@@ -418,10 +409,8 @@ is_slave() {
     fi
     
     tmpfile=`mktemp ${HA_RSCTMP}/is_slave.${OCF_RESOURCE_INSTANCE}.XXXXXX`
-    
-    mysql_options="$MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL"
-    
-    $MYSQL $mysql_options \
+   
+    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
     -e 'SHOW SLAVE STATUS\G' > $tmpfile
     
     # "SHOW SLAVE STATUS" returns an empty set if instance is not a
@@ -446,9 +435,7 @@ get_slave_info() {
     
     tmpfile=`mktemp ${HA_RSCTMP}/check_slave.${OCF_RESOURCE_INSTANCE}.XXXXXX`
     
-    mysql_options="$MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL"
-    
-    $MYSQL $mysql_options \
+    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
     -e 'SHOW SLAVE STATUS\G' > $tmpfile
     
     if [ -s $tmpfile ]; then
@@ -531,8 +518,8 @@ check_slave() {
             set_reader_vip_attr 0
             
             # try to restart slave
-            ocf_run $MYSQL $MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL \
-            -e "START SLAVE"
+            ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
+                -e "START SLAVE"
             
             # Return success to prevent a restart
             exit $OCF_SUCCESS
@@ -613,7 +600,7 @@ set_master() {
     # from the laste master the slave replicated from, or freshly
     # reset with RESET MASTER.
     
-    ocf_run $MYSQL $MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL \
+    ocf_run $MYSQL_OPTIONS_REPL \
         -e "CHANGE MASTER TO MASTER_HOST='$new_master_IP', \
         MASTER_USER='$OCF_RESKEY_replication_user', \
         MASTER_PASSWORD='$OCF_RESKEY_replication_passwd' $master_params"
@@ -633,16 +620,13 @@ unset_master(){
         return $OCF_SUCCESS
     fi
     
-    local mysql_options
-    mysql_options="$MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL"
-    
     local tmpfile
     tmpfile=`mktemp ${HA_RSCTMP}/unset_master.${OCF_RESOURCE_INSTANCE}.XXXXXX`
     
     # At this point, the master is read only so there should not be much binlogs to transfer
     # Let's wait for the last bits
     while true; do
-        $MYSQL $mysql_options \
+        ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
         -e 'SHOW PROCESSLIST\G' > $tmpfile
         if grep 'Waiting for master to send event' $tmpfile >/dev/null; then
             ocf_log info "MySQL slave has finished reading master binary log"
@@ -666,16 +650,16 @@ unset_master(){
     
     # Now, stop the slave I/O thread and wait for relay log
     # processing to complete
-    ocf_run $MYSQL $mysql_options \
-    -e "STOP SLAVE IO_THREAD"
+    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
+        -e "STOP SLAVE IO_THREAD"
     if [ $? -gt 0 ]; then
         ocf_log err "Error stopping slave IO thread"
         exit $OCF_ERR_GENERIC
     fi
     
     while true; do
-        $MYSQL $mysql_options \
-        -e 'SHOW PROCESSLIST\G' > $tmpfile
+        ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
+            -e 'SHOW PROCESSLIST\G' > $tmpfile
         if grep 'Has read all relay log' $tmpfile >/dev/null; then
             ocf_log info "MySQL slave has finished processing relay log"
             break
@@ -690,14 +674,14 @@ unset_master(){
     rm -f $tmpfile
     
     # Now, stop all slave activity and unset the master host
-    ocf_run $MYSQL $mysql_options \
-    -e "STOP SLAVE"
+    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
+        -e "STOP SLAVE"
     if [ $? -gt 0 ]; then
         ocf_log err "Error stopping rest slave threads"
         exit $OCF_ERR_GENERIC
     fi
         
-    ocf_run $MYSQL $mysql_options \
+    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
         -e "RESET SLAVE;" 
     if [ $? -gt 0 ]; then
         ocf_log err "Failed to set master"
@@ -708,7 +692,7 @@ unset_master(){
 # Start replication as slave
 start_slave() {
         
-    ocf_run $MYSQL $MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL \
+    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
         -e "START SLAVE"
 }
 
@@ -768,8 +752,10 @@ get_writer_vip_attr() {
 
 # Stores data for MASTER STATUS from MySQL
 update_data_master_status() {
-   tmpfile=`mktemp ${HA_RSCTMP}/master_status.${OCF_RESOURCE_INSTANCE}.XXXXXX`
-   $MYSQL $mysql_options -e "SHOW MASTER STATUS\G" > $tmpfile
+
+   master_status_file="${HA_RSCTMP}/master_status.${OCF_RESOURCE_INSTANCE}"
+
+   ocf_run $MYSQL $MYSQL_OPTIONS_REPL -e "SHOW MASTER STATUS\G" > $master_status_file
 }
 
 
@@ -778,7 +764,7 @@ update_data_master_status() {
 # Arguments:
 #  $1 The value to get.
 get_master_status() {
-   awk -v var="$1" '$1 == var ":" {print substr($0, index($0, ":") + 2)}' "$tmpfile"
+   awk -v var="$1" '$1 == var ":" {print substr($0, index($0, ":") + 2)}' "$master_status_file"
 }
 
 
@@ -870,13 +856,10 @@ mysql_monitor() {
         if is_slave; then
             check_slave
         fi
-        
-        local mysql_options
-        mysql_options="$MYSQL_OPTIONS_LOCAL --user=$OCF_RESKEY_test_user --password=$OCF_RESKEY_test_passwd"
-        
+
         # Check for test table
-        ocf_run $MYSQL $mysql_options \
-        -e "SELECT COUNT(*) FROM $OCF_RESKEY_test_table"
+        ocf_run -q $MYSQL $MYSQL_OPTIONS_TEST \
+            -e "SELECT COUNT(*) FROM $OCF_RESKEY_test_table"
         rc=$?
         
         if [ $rc -ne 0 ]; then
@@ -1095,7 +1078,7 @@ mysql_promote() {
     if ( ! mysql_status ); then
         return $OCF_NOT_RUNNING
     fi
-    ocf_run $MYSQL $MYSQL_OPTIONS_LOCAL $MYSQL_OPTIONS_REPL \
+    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
         -e "STOP SLAVE"
 
     # Set Master Info in CIB, cluster level attribute
@@ -1198,12 +1181,12 @@ mysql_notify() {
                 # in order for the slaves to complete the read of binlogs
                 local tmpfile
                 tmpfile=`mktemp ${HA_RSCTMP}/threads.${OCF_RESOURCE_INSTANCE}.XXXXXX`
-                ocf_run $MYSQL $mysql_options \
+                ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
                 -e "SHOW PROCESSLIST" > $tmpfile
                 
                 for thread in `awk '$0 !~ /Binlog Dump|system user|event_scheduler|SHOW PROCESSLIST/ && $0 ~ /^[0-9]/ {print $1}' $tmpfile`
                 do
-                    ocf_run $MYSQL $mysql_options \
+                    ocf_run $MYSQL $MYSQL_OPTIONS_REPL \
                         -e "KILL ${thread}"
                 done
                 return $OCF_SUCCESS

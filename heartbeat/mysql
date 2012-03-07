@@ -5,13 +5,13 @@
 #
 # Description:  Manages a MySQL database as Linux-HA resource
 #
-# Authors:	Alan Robertson:               DB2 Script
-#		Jakub Janczak:                rewrite as MySQL
-#		Andrew Beekhof:               cleanup and import
-#		Sebastian Reitenbach:         add OpenBSD defaults, more cleanup
-#		Narayan Newton:               add Gentoo/Debian defaults
-#		Marian Marinov, Florian Haas: add replication capability
-#		Yves Trudeau, Baron Schwartz: add VIP support and improve replication
+# Authors:  Alan Robertson:               DB2 Script
+#           Jakub Janczak:                rewrite as MySQL
+#           Andrew Beekhof:               cleanup and import
+#           Sebastian Reitenbach:         add OpenBSD defaults, more cleanup
+#           Narayan Newton:               add Gentoo/Debian defaults
+#           Marian Marinov, Florian Haas: add replication capability
+#           Yves Trudeau, Baron Schwartz: add VIP support and improve replication
 #
 # Support:  linux-ha@lists.linux-ha.org
 # License:  GNU General Public License (GPL)

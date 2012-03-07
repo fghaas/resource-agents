@@ -349,7 +349,6 @@ CRM_MASTER="${HA_SBIN_DIR}/crm_master -l reboot "
 HOSTNAME=`uname -n`
 CRM_ATTR="${HA_SBIN_DIR}/crm_attribute -N $HOSTNAME "
 INSTANCE_ATTR_NAME=`echo ${OCF_RESOURCE_INSTANCE}| awk -F : '{print $1}'`
-CUT=`which cut`
 
 #######################################################################
 
@@ -486,7 +485,7 @@ check_slave() {
             ocf_log warn "MySQL Slave IO threads currently not running."
 
             # Sanity check, are we at least on the right master
-            new_master_IP=`${HA_SBIN_DIR}/crm_attribute --type crm_config --name replication_info -s mysql_replication --query  -q | $CUT -d'|' -f1`
+            new_master_IP=`${HA_SBIN_DIR}/crm_attribute --type crm_config --name replication_info -s mysql_replication --query  -q | cut -d'|' -f1`
 
             if [ "$master_host" != "$new_master_IP" ]; then
                # Not pointing to the right master, not good, removing the VIPs
@@ -563,7 +562,7 @@ set_master() {
     local new_master_IP master_log_file master_log_pos
     local master_params
 
-    new_master_IP=`${HA_SBIN_DIR}/crm_attribute --type crm_config --name replication_info -s mysql_replication --query  -q | $CUT -d'|' -f1`
+    new_master_IP=`${HA_SBIN_DIR}/crm_attribute --type crm_config --name replication_info -s mysql_replication --query  -q | cut -d'|' -f1`
 
     # Keep replication position
     get_slave_info
@@ -575,8 +574,8 @@ set_master() {
         rm -f $tmpfile
         return
     else
-        master_log_file=`${HA_SBIN_DIR}/crm_attribute --type crm_config --name replication_info -s mysql_replication --query  -q | $CUT -d'|' -f2`
-        master_log_pos=`${HA_SBIN_DIR}/crm_attribute --type crm_config --name replication_info -s mysql_replication --query  -q | $CUT -d'|' -f3`
+        master_log_file=`${HA_SBIN_DIR}/crm_attribute --type crm_config --name replication_info -s mysql_replication --query  -q | cut -d'|' -f2`
+        master_log_pos=`${HA_SBIN_DIR}/crm_attribute --type crm_config --name replication_info -s mysql_replication --query  -q | cut -d'|' -f3`
         if [ -n "$master_log_file" -a -n "$master_log_pos" ]; then
             master_params=", MASTER_LOG_FILE='$master_log_file', \
             MASTER_LOG_POS=$master_log_pos"

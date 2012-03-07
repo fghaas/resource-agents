@@ -315,7 +315,7 @@ slaves</shortdesc>
 
 <actions>
 <action name="start" timeout="120" />
-<action name="stop" timeout="300" />
+<action name="stop" timeout="120" />
 <action name="status" timeout="60" />
 <action name="monitor" depth="0" timeout="30" interval="20" />
 <action name="monitor" role="Master" depth="0" timeout="30" interval="10" />

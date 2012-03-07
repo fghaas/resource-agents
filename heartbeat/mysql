@@ -1150,76 +1150,57 @@ mysql_notify() {
 
 #######################################################################
 
-main() {
 
-    ##########################################################################
-    # If DEBUG_LOG is set, make this resource agent easy to debug: set up the
-    # debug log and direct all output to it.  Otherwise, redirect to /dev/null.
-    # The log directory must be a directory owned by root, with permissions 0700,
-    # and the log must be writable and not a symlink.
-    ##########################################################################
-    if [ "${DEBUG_LOG}" -a -w "${DEBUG_LOG}" -a ! -L "${DEBUG_LOG}" ]; then
-        DEBUG_LOG_DIR="${DEBUG_LOG%/*}"
-        if [ -d "${DEBUG_LOG_DIR}" ]; then
-            exec 9>>"$DEBUG_LOG"
-            exec 2>&9
-            date >&9
-            echo "$*" >&9
-            env | grep OCF_ | sort >&9
-            set -x
-        else
-            exec 9>/dev/null
-        fi
+##########################################################################
+# If DEBUG_LOG is set, make this resource agent easy to debug: set up the
+# debug log and direct all output to it.  Otherwise, redirect to /dev/null.
+# The log directory must be a directory owned by root, with permissions 0700,
+# and the log must be writable and not a symlink.
+##########################################################################
+if [ "${DEBUG_LOG}" -a -w "${DEBUG_LOG}" -a ! -L "${DEBUG_LOG}" ]; then
+    DEBUG_LOG_DIR="${DEBUG_LOG%/*}"
+    if [ -d "${DEBUG_LOG_DIR}" ]; then
+        exec 9>>"$DEBUG_LOG"
+        exec 2>&9
+        date >&9
+        echo "$*" >&9
+        env | grep OCF_ | sort >&9
+        set -x
+    else
+        exec 9>/dev/null
     fi
-
-    case "$1" in
-        meta-data)	meta_data
-        exit $OCF_SUCCESS;;
-        usage|help)	usage
-        exit $OCF_SUCCESS;;
-    esac
-
-    mysql_validate
-    rc=$?
-    LSB_STATUS_STOPPED=3
-    if [ $rc -ne 0 ]; then
-        case "$1" in
-            stop) exit $OCF_SUCCESS;;
-            monitor) exit $OCF_NOT_RUNNING;;
-            status) exit $LSB_STATUS_STOPPED;;
-            *) exit $rc;;
-        esac
-    fi
-
-    # What kind of method was invoked?
-    case "$1" in
-        start)	mysql_start;;
-        stop)		mysql_stop;;
-        status)	mysql_status;;
-        monitor)	mysql_monitor;;
-        promote)	mysql_promote;;
-        demote)	mysql_demote;;
-        notify)	mysql_notify;;
-        validate-all)	exit $OCF_SUCCESS;;
-
-        *)		usage
-        exit $OCF_ERR_UNIMPLEMENTED;;
-    esac
-
-} #closing main
-
-#############################################################################
-# Execute the program if it was not sourced from another file.  This makes it
-# possible to source without executing, which makes it testable.
-#############################################################################
-
-if [ "$(basename "$0")" = "mysql" ] || [ "$(basename "$0")" = "bash" -a "$_" = "$0" ]; then
-    # Uncomment this line to enable debugging.
-    export DEBUG_LOG="/tmp/mysql.ocf.ra.debug/log"
-
-    main "$@"
-
-    rc=$?
-    rm -rf "${WORKDIR}"
-    exit $rc
 fi
+
+case "$1" in
+  meta-data)    meta_data
+        exit $OCF_SUCCESS;;
+  usage|help)   usage
+        exit $OCF_SUCCESS;;
+esac
+
+mysql_validate
+rc=$?
+LSB_STATUS_STOPPED=3
+if [ $rc -ne 0 ]; then
+    case "$1" in
+        stop) exit $OCF_SUCCESS;;
+        monitor) exit $OCF_NOT_RUNNING;;
+        status) exit $LSB_STATUS_STOPPED;;
+        *) exit $rc;;
+    esac
+fi
+
+# What kind of method was invoked?
+case "$1" in
+  start)    mysql_start;;
+  stop)     mysql_stop;;
+  status)   mysql_status;;
+  monitor)  mysql_monitor;;
+  promote)  mysql_promote;;
+  demote)   mysql_demote;;
+  notify)   mysql_notify;;
+  validate-all) exit $OCF_SUCCESS;;
+
+ *)     usage
+        exit $OCF_ERR_UNIMPLEMENTED;;
+esac

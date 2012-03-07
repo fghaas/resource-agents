@@ -39,15 +39,6 @@
 #   OCF_RESKEY_log
 #   OCF_RESKEY_pid
 #   OCF_RESKEY_socket
-#
-# TODO (Yves):
-#  - remove dependencies over hostnames because of required skip-name-reolve
-#  - stop using a user with super priv. for replication
-#  - Sent master info to cib at demote, not from the slaves
-#  - catch "Too many connections" error and react sanely
-#  - clean the code for ocf_run calling mysql client
-#  - Uniformize the intending
-#  - Add support for mha
 
 #######################################################################
 # Initialization:

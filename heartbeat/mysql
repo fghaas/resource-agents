@@ -311,14 +311,6 @@ slaves</shortdesc>
 <content type="boolean" default="${OCF_RESKEY_evict_outdated_slaves_default}" />
 </parameter>
 
-<parameter name="MHASupport" unique="0" required="0">
-<longdesc lang="en">
-Enable the usage of the MHA tool to setup master.
-</longdesc>
-<shortdesc lang="en">Enable MHA tool</shortdesc>
-<content type="boolean" default="0" />
-</parameter>
-
 </parameters>
 
 <actions>

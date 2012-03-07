@@ -39,7 +39,6 @@
 #   OCF_RESKEY_log
 #   OCF_RESKEY_pid
 #   OCF_RESKEY_socket
-#   OCF_RESKEY_MysqlHASupport
 #
 # TODO (Yves):
 #  - remove dependencies over hostnames because of required skip-name-reolve
